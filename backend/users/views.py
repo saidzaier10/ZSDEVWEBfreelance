@@ -7,6 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from .serializers import RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer
+from config.utils import get_client_ip
 import logging
 
 logger = logging.getLogger('users')
@@ -30,7 +31,7 @@ class RegisterView(generics.CreateAPIView):
     throttle_classes = [RegisterRateThrottle]
 
     def create(self, request, *args, **kwargs):
-        logger.info(f"Tentative d'inscription depuis IP: {self.get_client_ip(request)}")
+        logger.info(f"Tentative d'inscription depuis IP: {get_client_ip(request)}")
         
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -49,15 +50,6 @@ class RegisterView(generics.CreateAPIView):
             }
         }, status=status.HTTP_201_CREATED)
     
-    def get_client_ip(self, request):
-        """Récupère l'IP du client"""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
-
 
 class LoginView(APIView):
     """Connexion utilisateur"""
@@ -67,7 +59,7 @@ class LoginView(APIView):
 
     def post(self, request):
         username = request.data.get('username', 'unknown')
-        logger.info(f"Tentative de connexion pour: {username} depuis IP: {self.get_client_ip(request)}")
+        logger.info(f"Tentative de connexion pour: {username} depuis IP: {get_client_ip(request)}")
         
         serializer = CustomTokenObtainPairSerializer(data=request.data)
         
@@ -79,15 +71,6 @@ class LoginView(APIView):
             logger.warning(f"Échec de connexion pour: {username} - Raison: {str(e)}")
             raise
     
-    def get_client_ip(self, request):
-        """Récupère l'IP du client"""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
-
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
     """Voir et modifier le profil de l'utilisateur connecté"""

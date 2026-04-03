@@ -6,6 +6,7 @@ import secrets
 import string
 from decimal import Decimal
 from django.utils import timezone
+from django.db import transaction
 from datetime import timedelta
 from .utils.constants import QuoteStatus, BillingType, PaymentConfig, QuoteConfig
 
@@ -17,13 +18,18 @@ class QuoteIdentifierMixin:
     """
 
     def generate_quote_number(self):
-        """Génère un numéro unique au format DEVIS-YYYYMM-XXX."""
+        """Génère un numéro unique au format DEVIS-YYYYMM-XXX (atomique)."""
         if not self.quote_number:
             date_part = timezone.now().strftime('%Y%m')
-            count = self.__class__.objects.filter(
-                quote_number__startswith=f'{QuoteConfig.QUOTE_NUMBER_PREFIX}-{date_part}'
-            ).count() + 1
-            self.quote_number = f'{QuoteConfig.QUOTE_NUMBER_PREFIX}-{date_part}-{count:03d}'
+            prefix = f'{QuoteConfig.QUOTE_NUMBER_PREFIX}-{date_part}'
+            with transaction.atomic():
+                count = (
+                    self.__class__.objects
+                    .select_for_update()
+                    .filter(quote_number__startswith=prefix)
+                    .count() + 1
+                )
+                self.quote_number = f'{prefix}-{count:03d}'
 
     def generate_signature_token(self):
         """Génère un token sécurisé (cryptographique) pour la signature électronique."""

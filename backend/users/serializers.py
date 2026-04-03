@@ -2,7 +2,7 @@ from rest_framework import serializers, validators
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.validators import EmailValidator, RegexValidator
-import bleach
+import nh3
 import re
 
 User = get_user_model()
@@ -61,7 +61,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_username(self, value):
         """Validation personnalisée du nom d'utilisateur"""
         # Nettoyer le username
-        value = bleach.clean(value, tags=[], strip=True).strip()
+        value = nh3.clean(value, tags=set()).strip()
         
         # Vérifier qu'il n'est pas vide après nettoyage
         if not value:
@@ -84,7 +84,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         """Validation personnalisée de l'email"""
         # Nettoyer et normaliser l'email
-        value = bleach.clean(value, tags=[], strip=True).strip().lower()
+        value = nh3.clean(value, tags=set()).strip().lower()
         
         # Vérifier le format avec une regex stricte
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -105,7 +105,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             return value
         
         # Nettoyer le téléphone
-        value = bleach.clean(value, tags=[], strip=True).strip()
+        value = nh3.clean(value, tags=set()).strip()
         
         # Supprimer les espaces et tirets
         cleaned = re.sub(r'[\s\-\(\)]', '', value)
@@ -118,7 +118,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             return value
         
         # Nettoyer le nom de l'entreprise
-        value = bleach.clean(value, tags=[], strip=True).strip()
+        value = nh3.clean(value, tags=set()).strip()
         
         # Limiter la longueur
         if len(value) > 200:
@@ -180,7 +180,7 @@ class UserSerializer(serializers.ModelSerializer):
         if not value:
             return value
         
-        value = bleach.clean(value, tags=[], strip=True).strip()
+        value = nh3.clean(value, tags=set()).strip()
         cleaned = re.sub(r'[\s\-\(\)]', '', value)
         
         phone_regex = r'^\+?1?\d{9,15}$'
@@ -194,7 +194,7 @@ class UserSerializer(serializers.ModelSerializer):
         if not value:
             return value
         
-        value = bleach.clean(value, tags=[], strip=True).strip()
+        value = nh3.clean(value, tags=set()).strip()
         
         if len(value) > 200:
             raise serializers.ValidationError("Le nom de l'entreprise ne peut pas dépasser 200 caractères")
@@ -212,7 +212,7 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
 
     def validate_username(self, value):
         """Nettoyer le username"""
-        return bleach.clean(value, tags=[], strip=True).strip()
+        return nh3.clean(value, tags=set()).strip()
 
     def validate(self, attrs):
         from django.contrib.auth import authenticate

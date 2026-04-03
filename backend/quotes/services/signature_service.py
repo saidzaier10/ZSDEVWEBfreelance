@@ -15,6 +15,7 @@ from ..utils.constants import (
     FileExtensions,
     ErrorMessages,
 )
+from config.utils import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ class SignatureService:
         quote.status = QuoteStatus.ACCEPTED
 
         # Enregistrer l'IP du client
-        quote.client_ip = SignatureService.extract_client_ip(request)
+        quote.client_ip = get_client_ip(request)
 
         # Sauvegarder le devis
         quote.save()
@@ -116,24 +117,3 @@ class SignatureService:
 
         return decoded_image, file_ext
 
-    @staticmethod
-    def extract_client_ip(request) -> str:
-        """
-        Extrait l'adresse IP du client depuis la requête
-
-        Args:
-            request: Objet request Django
-
-        Returns:
-            Adresse IP du client
-        """
-        # Vérifier si derrière un proxy
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            # Prendre la première IP de la liste
-            ip = x_forwarded_for.split(',')[0].strip()
-        else:
-            # IP directe
-            ip = request.META.get('REMOTE_ADDR', '')
-
-        return ip

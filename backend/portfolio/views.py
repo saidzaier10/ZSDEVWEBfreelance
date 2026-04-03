@@ -13,7 +13,7 @@ from .serializers import (
     TestimonialSerializer, ContactMessageSerializer
 )
 from .services import get_portfolio_statistics
-from .permissions import IsAdminOrReadOnly
+from quotes.permissions import IsAdminOrReadOnly
 
 
 @method_decorator(cache_page(60 * 15), name='dispatch')  # Cache 15 minutes

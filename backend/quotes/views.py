@@ -177,12 +177,14 @@ class QuoteViewSet(viewsets.ModelViewSet):
         """Permissions par action"""
         if self.action == 'create':
             return [permissions.AllowAny()]
-        elif self.action in ['list', 'retrieve']:
-            # Utilisateurs authentifiés peuvent voir leurs propres devis
+        elif self.action in ['list', 'retrieve', 'my_quotes']:
             return [permissions.IsAuthenticated()]
-        elif self.action in ['update', 'partial_update', 'destroy']:
+        elif self.action in ['update', 'partial_update', 'destroy', 'statistics', 'bulk_delete', 'send_email']:
             return [permissions.IsAdminUser()]
-        return [permissions.AllowAny()]
+        elif self.action in ['reject', 'duplicate', 'download_pdf']:
+            return [permissions.IsAuthenticated()]
+        # public_view et sign_quote sont déjà décorés avec AllowAny explicitement
+        return [permissions.IsAuthenticated()]
     
     def get_queryset(self):
         """

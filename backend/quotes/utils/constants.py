@@ -29,7 +29,7 @@ class QuoteStatus:
     EDITABLE_STATUSES = [DRAFT]
 
     # Statuts qui permettent le renvoi
-    RESENDABLE_STATUSES = [DRAFT, VIEWED, REJECTED]
+    RESENDABLE_STATUSES = [DRAFT, SENT, VIEWED, REJECTED]
 
     # Statuts qui peuvent expirer
     EXPIRABLE_STATUSES = [DRAFT, SENT, VIEWED]

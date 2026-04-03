@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Technology, Project, ProjectImage, Testimonial, ContactMessage
+from config.utils import get_client_ip
 
 
 class TechnologySerializer(serializers.ModelSerializer):
@@ -98,7 +99,7 @@ class ContactMessageSerializer(serializers.ModelSerializer):
         # Récupérer les métadonnées de la requête
         request = self.context.get('request')
         if request:
-            validated_data['ip_address'] = self.get_client_ip(request)
+            validated_data['ip_address'] = get_client_ip(request)
             validated_data['user_agent'] = request.META.get('HTTP_USER_AGENT', '')[:500]
 
         # Créer le message
@@ -114,11 +115,3 @@ class ContactMessageSerializer(serializers.ModelSerializer):
 
         return message
 
-    def get_client_ip(self, request):
-        """Récupérer l'IP du client"""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip

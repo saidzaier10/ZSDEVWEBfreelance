@@ -61,23 +61,30 @@ class ProjectTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectType
-        fields = '__all__'
+        fields = [
+            'id', 'category', 'category_detail', 'category_name',
+            'name', 'description', 'base_price', 'estimated_days',
+            'is_active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class DesignOptionSerializer(serializers.ModelSerializer):
     """Serializer pour les options de design"""
-    
+
     class Meta:
         model = DesignOption
-        fields = '__all__'
+        fields = ['id', 'name', 'description', 'price_supplement', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class ComplexityLevelSerializer(serializers.ModelSerializer):
     """Serializer pour les niveaux de complexité"""
-    
+
     class Meta:
         model = ComplexityLevel
-        fields = '__all__'
+        fields = ['id', 'name', 'description', 'price_multiplier', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class SupplementaryOptionSerializer(serializers.ModelSerializer):
@@ -93,7 +100,12 @@ class SupplementaryOptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SupplementaryOption
-        fields = '__all__'
+        fields = [
+            'id', 'name', 'description', 'price', 'billing_type', 'billing_type_display',
+            'compatible_categories', 'compatible_categories_detail', 'is_universal',
+            'is_active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
     def get_is_universal(self, obj):
         """Indique si l'option est disponible pour toutes les catégories"""

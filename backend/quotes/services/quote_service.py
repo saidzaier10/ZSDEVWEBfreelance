@@ -7,6 +7,7 @@ from typing import Dict, Optional
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count, Sum, Avg
+from django.db.models.functions import TruncMonth
 from datetime import timedelta
 from .pdf_service import PDFService
 from .email_service import EmailService
@@ -264,8 +265,10 @@ class QuoteService:
         # Copier les options supplémentaires
         new_quote.supplementary_options.set(quote.supplementary_options.all())
 
-        # Recalculer les prix
-        new_quote.calculate_prices()
+        # Recalculer les prix et appliquer les valeurs calculées au modèle
+        prices = new_quote.calculate_prices()
+        for field, value in prices.items():
+            setattr(new_quote, field, value)
         new_quote.save()
 
         logger.info(f"Devis {quote.id} dupliqué vers nouveau devis {new_quote.id}")
@@ -326,7 +329,7 @@ class QuoteService:
         twelve_months_ago = timezone.now() - timedelta(days=365)
         quotes_by_month = list(
             Quote.objects.filter(created_at__gte=twelve_months_ago)
-            .extra(select={'month': "TO_CHAR(created_at, 'YYYY-MM')"})
+            .annotate(month=TruncMonth('created_at'))
             .values('month')
             .annotate(count=Count('id'), total=Sum('total_ttc'))
             .order_by('month')

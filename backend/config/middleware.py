@@ -6,6 +6,7 @@ import logging
 import re
 from django.http import JsonResponse
 from django.conf import settings
+from config.utils import get_client_ip
 
 logger = logging.getLogger('django.security')
 
@@ -69,7 +70,7 @@ class SecurityMiddleware:
 
         # 1. Vérifier la taille de la requête
         if self.is_request_too_large(request):
-            logger.warning(f"Requête trop volumineuse détectée depuis {self.get_client_ip(request)}")
+            logger.warning(f"Requête trop volumineuse détectée depuis {get_client_ip(request)}")
             if block_mode:
                 return JsonResponse(
                     {'error': 'Requête trop volumineuse'},
@@ -78,7 +79,7 @@ class SecurityMiddleware:
         
         # 2. Vérifier le User-Agent (uniquement en production)
         if not settings.DEBUG and self.is_suspicious_user_agent(request):
-            logger.warning(f"User-Agent suspect détecté: {request.META.get('HTTP_USER_AGENT')} depuis {self.get_client_ip(request)}")
+            logger.warning(f"User-Agent suspect détecté: {request.META.get('HTTP_USER_AGENT')} depuis {get_client_ip(request)}")
             if block_mode:
                 return JsonResponse(
                     {'error': 'Accès refusé'},
@@ -87,7 +88,7 @@ class SecurityMiddleware:
         
         # 3. Détecter les tentatives d'injection SQL/XSS dans l'URL
         if self.contains_malicious_patterns(request.path) or self.contains_malicious_patterns(request.GET.urlencode()):
-            logger.error(f"Tentative d'attaque détectée dans l'URL: {request.path} depuis {self.get_client_ip(request)}")
+            logger.error(f"Tentative d'attaque détectée dans l'URL: {request.path} depuis {get_client_ip(request)}")
             if block_mode:
                 return JsonResponse(
                     {'error': 'Requête invalide'},
@@ -100,7 +101,7 @@ class SecurityMiddleware:
                 try:
                     body_str = request.body.decode('utf-8', errors='ignore')
                     if self.contains_malicious_patterns(body_str):
-                        logger.error(f"Tentative d'attaque détectée dans le body depuis {self.get_client_ip(request)}")
+                        logger.error(f"Tentative d'attaque détectée dans le body depuis {get_client_ip(request)}")
                         if block_mode:
                             return JsonResponse(
                                 {'error': 'Contenu de la requête invalide'},
@@ -163,36 +164,18 @@ class SecurityMiddleware:
         return False
 
     def add_security_headers(self, response):
-        """Ajouter des en-têtes de sécurité à la réponse"""
+        """Ajouter des en-têtes de sécurité à la réponse.
+
+        Note: CSP et X-Frame-Options sont gérés uniquement par Nginx pour éviter
+        les headers en double. Seuls les headers non couverts par Nginx sont ajoutés ici.
+        """
         # Permissions Policy (anciennement Feature Policy)
         response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
-        
+
         # Referrer Policy
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        
-        # Content Security Policy (CSP)
-        if not settings.DEBUG:
-            response['Content-Security-Policy'] = (
-                "default-src 'self'; "
-                "script-src 'self'; "
-                "style-src 'self' 'unsafe-inline'; "
-                "img-src 'self' data: https:; "
-                "font-src 'self'; "
-                "connect-src 'self'; "
-                "frame-ancestors 'none';"
-            )
-        
+
         return response
-
-    def get_client_ip(self, request):
-        """Récupérer l'adresse IP du client"""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
-
 
 class RequestLoggingMiddleware:
     """
@@ -217,7 +200,7 @@ class RequestLoggingMiddleware:
 
     def log_request(self, request):
         """Logger les informations de la requête"""
-        ip = self.get_client_ip(request)
+        ip = get_client_ip(request)
         method = request.method
         path = request.path
         user = request.user if hasattr(request, 'user') and request.user.is_authenticated else 'Anonymous'
@@ -228,16 +211,8 @@ class RequestLoggingMiddleware:
         """Logger la réponse"""
         # Logger seulement les erreurs et les succès importants
         if response.status_code >= 400:
-            ip = self.get_client_ip(request)
+            ip = get_client_ip(request)
             self.logger.warning(
                 f"Response {response.status_code} for {request.method} {request.path} - IP: {ip}"
             )
 
-    def get_client_ip(self, request):
-        """Récupérer l'adresse IP du client"""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
