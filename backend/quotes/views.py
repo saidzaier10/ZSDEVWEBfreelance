@@ -5,11 +5,9 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from django.db.models import Count, Sum, Avg, Q
+from django.db.models import Q
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
-from datetime import timedelta
 
 from .models import (
     Company,
@@ -340,48 +338,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='statistics', permission_classes=[permissions.IsAdminUser])
     def statistics(self, request):
         """Statistiques des devis (admin uniquement)"""
-        total_quotes = Quote.objects.count()
-        
-        aggregates = Quote.objects.aggregate(
-            total_amount=Sum('total_ttc'),
-            average_amount=Avg('total_ttc')
-        )
-        
-        status_breakdown = dict(
-            Quote.objects.values('status').annotate(count=Count('id')).values_list('status', 'count')
-        )
-        
-        sent_count = Quote.objects.filter(status__in=['sent', 'viewed', 'accepted']).count()
-        accepted_count = Quote.objects.filter(status='accepted').count()
-        conversion_rate = (accepted_count / sent_count * 100) if sent_count > 0 else 0
-        
-        twelve_months_ago = timezone.now() - timedelta(days=365)
-        quotes_by_month = Quote.objects.filter(
-            created_at__gte=twelve_months_ago
-        ).extra(
-            select={'month': "TO_CHAR(created_at, 'YYYY-MM')"}
-        ).values('month').annotate(
-            count=Count('id'),
-            total=Sum('total_ttc')
-        ).order_by('month')
-        
-        top_project_types = Quote.objects.values(
-            'project_type__name'
-        ).annotate(
-            count=Count('id'),
-            total_amount=Sum('total_ttc')
-        ).order_by('-count')[:5]
-        
-        stats_data = {
-            'total_quotes': total_quotes,
-            'total_amount': aggregates['total_amount'] or 0,
-            'average_amount': aggregates['average_amount'] or 0,
-            'status_breakdown': status_breakdown,
-            'conversion_rate': round(conversion_rate, 2),
-            'quotes_by_month': list(quotes_by_month),
-            'top_project_types': list(top_project_types)
-        }
-        
+        stats_data = QuoteService.get_statistics()
         serializer = QuoteStatisticsSerializer(stats_data)
         return Response(serializer.data)
     

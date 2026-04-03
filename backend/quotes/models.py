@@ -1,12 +1,10 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
-import secrets
-import string
-from .utils.constants import QuoteStatus, BillingType, PaymentConfig, QuoteConfig
+from .utils.constants import QuoteStatus, BillingType, EmailType
+from .mixins import QuoteIdentifierMixin, QuoteExpirationMixin, QuotePricingMixin
 
 User = get_user_model()
 
@@ -202,7 +200,7 @@ class QuoteTemplate(models.Model):
         return self.name
 
 
-class Quote(models.Model):
+class Quote(QuoteIdentifierMixin, QuoteExpirationMixin, QuotePricingMixin, models.Model):
     """Devis créés par les utilisateurs"""
     STATUS_CHOICES = QuoteStatus.CHOICES
 
@@ -412,151 +410,7 @@ class Quote(models.Model):
 
     def __str__(self):
         return f"Devis #{self.quote_number or self.id} - {self.client_name}"
-    
-    def calculate_prices(self, skip_m2m=False):
-        """
-        Calcule tous les prix du devis avec remise et génère la répartition des paiements.
 
-        Cette méthode est le cœur du calcul tarifaire. Elle agrège tous les composants
-        du devis (type de projet, design, complexité, options) et applique la remise
-        puis la TVA pour obtenir le prix final TTC.
-
-        Étapes du calcul :
-        1. Prix de base du type de projet
-        2. Ajout du supplément de design
-        3. Application du multiplicateur de complexité
-        4. Ajout des options supplémentaires (one_time uniquement)
-        5. Application de la remise (pourcentage ou montant fixe)
-        6. Calcul de la TVA
-        7. Obtention du total TTC
-        8. Répartition en 3 paiements (30% / 40% / 30%)
-
-        Args:
-            skip_m2m: Si True, ignore les relations ManyToMany (utilisé lors de la création
-                     initiale du devis avant qu'il ait un ID en base)
-
-        Returns:
-            dict: Dictionnaire contenant tous les montants calculés
-        """
-        # 1. Prix de base du type de projet
-        subtotal = Decimal('0.00')
-
-        if self.project_type:
-            subtotal = self.project_type.base_price
-
-        # 2. Option de design
-        if self.design_option:
-            subtotal += self.design_option.price_supplement
-
-        # 3. Multiplicateur de complexité
-        if self.complexity_level:
-            subtotal *= self.complexity_level.price_multiplier
-
-        # 4. Options supplémentaires (paiement unique uniquement)
-        # Ne pas accéder aux M2M si l'objet n'a pas encore d'ID
-        if not skip_m2m and self.pk:
-            for option in self.supplementary_options.filter(billing_type='one_time'):
-                subtotal += option.price
-
-        # 5. Calcul de la remise
-        discount_amount = Decimal('0.00')
-        if self.discount_value > 0:
-            if self.discount_type == 'percent':
-                discount_amount = subtotal * (self.discount_value / Decimal('100'))
-            elif self.discount_type == 'fixed':
-                discount_amount = self.discount_value
-
-        # 6. Sous-total après remise
-        subtotal_after_discount = subtotal - discount_amount
-
-        # 7. TVA
-        tva_amount = subtotal_after_discount * (self.tva_rate / Decimal('100'))
-
-        # 8. Total TTC
-        total_ttc = subtotal_after_discount + tva_amount
-
-        # 9. Répartition des paiements
-        payment_first = total_ttc * Decimal(str(PaymentConfig.FIRST_PAYMENT_PERCENT))
-        payment_second = total_ttc * Decimal(str(PaymentConfig.SECOND_PAYMENT_PERCENT))
-        payment_final = total_ttc * Decimal(str(PaymentConfig.FINAL_PAYMENT_PERCENT))
-
-        # 10. Durée estimée
-        estimated_days = self.project_type.estimated_days if self.project_type else 10
-        if self.complexity_level:
-            estimated_days = int(estimated_days * float(self.complexity_level.price_multiplier))
-
-        return {
-            'subtotal_ht': round(subtotal, 2),
-            'discount_amount': round(discount_amount, 2),
-            'subtotal_after_discount': round(subtotal_after_discount, 2),
-            'tva_amount': round(tva_amount, 2),
-            'total_ttc': round(total_ttc, 2),
-            'payment_first': round(payment_first, 2),
-            'payment_second': round(payment_second, 2),
-            'payment_final': round(payment_final, 2),
-            'estimated_duration_days': estimated_days,
-        }
-    
-    def generate_quote_number(self):
-        """
-        Génère un numéro de devis unique au format : DEVIS-YYYYMM-XXX
-
-        Format :
-        - DEVIS : préfixe fixe
-        - YYYYMM : année et mois (ex: 202511 pour novembre 2025)
-        - XXX : numéro séquentiel sur 3 chiffres (001, 002, 003, etc.)
-
-        Exemple : DEVIS-202511-042 (42ème devis de novembre 2025)
-
-        La numérotation recommence à 001 chaque mois.
-        """
-        if not self.quote_number:
-            date_part = timezone.now().strftime('%Y%m')
-            # Compte les devis existants pour ce mois et incrémente
-            count = Quote.objects.filter(
-                quote_number__startswith=f'DEVIS-{date_part}'
-            ).count() + 1
-            self.quote_number = f'DEVIS-{date_part}-{count:03d}'
-    
-    def generate_signature_token(self):
-        """
-        Génère un token unique sécurisé pour la signature électronique.
-
-        Le token fait 64 caractères alphanumériques et est généré avec le module
-        secrets (cryptographiquement sécurisé) pour éviter toute prédiction.
-
-        Ce token est utilisé dans l'URL de signature : /devis/sign/{token}/
-        Il permet d'identifier de manière unique et sécurisée un devis sans authentification.
-        """
-        if not self.signature_token:
-            alphabet = string.ascii_letters + string.digits
-            self.signature_token = ''.join(secrets.choice(alphabet) for _ in range(64))
-    
-    def calculate_expiration_date(self):
-        """Calcule la date d'expiration selon QuoteConfig.DEFAULT_EXPIRATION_DAYS"""
-        if not self.expires_at:
-            self.expires_at = timezone.now() + timedelta(days=QuoteConfig.DEFAULT_EXPIRATION_DAYS)
-    
-    def check_if_expired(self):
-        """Vérifie et marque le devis comme expiré si nécessaire"""
-        if self.expires_at and timezone.now() > self.expires_at and self.status in ['draft', 'sent', 'viewed']:
-            self.status = 'expired'
-            self.save(update_fields=['status'])
-            return True
-        return False
-    
-    @property
-    def is_expired(self):
-        """Vérifie si le devis est expiré"""
-        return self.expires_at and timezone.now() > self.expires_at
-    
-    @property
-    def signature_url(self):
-        """URL de signature électronique"""
-        if self.signature_token:
-            return f"/devis/sign/{self.signature_token}/"
-        return None
-    
     def save(self, *args, **kwargs):
         """
         Surcharge de la méthode save pour automatiser les calculs et générations.
@@ -609,12 +463,7 @@ class Quote(models.Model):
 
 class QuoteEmailLog(models.Model):
     """Log des emails envoyés pour les devis"""
-    EMAIL_TYPE_CHOICES = [
-        ('created', 'Création du devis'),
-        ('reminder', 'Rappel'),
-        ('accepted', 'Acceptation'),
-        ('rejected', 'Refus'),
-    ]
+    EMAIL_TYPE_CHOICES = EmailType.CHOICES
     
     quote = models.ForeignKey(Quote, on_delete=models.CASCADE, related_name='email_logs')
     email_type = models.CharField(max_length=20, choices=EMAIL_TYPE_CHOICES)

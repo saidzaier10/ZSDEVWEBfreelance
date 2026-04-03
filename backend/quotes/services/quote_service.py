@@ -6,6 +6,8 @@ import logging
 from typing import Dict, Optional
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Count, Sum, Avg
+from datetime import timedelta
 from .pdf_service import PDFService
 from .email_service import EmailService
 from .signature_service import SignatureService
@@ -294,3 +296,54 @@ class QuoteService:
             return True
 
         return False
+
+    @staticmethod
+    def get_statistics() -> Dict:
+        """
+        Calcule les statistiques globales des devis.
+
+        Returns:
+            Dictionnaire avec total_quotes, total_amount, average_amount,
+            status_breakdown, conversion_rate, quotes_by_month, top_project_types.
+        """
+        from ..models import Quote
+
+        aggregates = Quote.objects.aggregate(
+            total_amount=Sum('total_ttc'),
+            average_amount=Avg('total_ttc'),
+        )
+
+        status_breakdown = dict(
+            Quote.objects.values('status')
+            .annotate(count=Count('id'))
+            .values_list('status', 'count')
+        )
+
+        sent_count = Quote.objects.filter(status__in=['sent', 'viewed', 'accepted']).count()
+        accepted_count = Quote.objects.filter(status='accepted').count()
+        conversion_rate = (accepted_count / sent_count * 100) if sent_count > 0 else 0
+
+        twelve_months_ago = timezone.now() - timedelta(days=365)
+        quotes_by_month = list(
+            Quote.objects.filter(created_at__gte=twelve_months_ago)
+            .extra(select={'month': "TO_CHAR(created_at, 'YYYY-MM')"})
+            .values('month')
+            .annotate(count=Count('id'), total=Sum('total_ttc'))
+            .order_by('month')
+        )
+
+        top_project_types = list(
+            Quote.objects.values('project_type__name')
+            .annotate(count=Count('id'), total_amount=Sum('total_ttc'))
+            .order_by('-count')[:5]
+        )
+
+        return {
+            'total_quotes': Quote.objects.count(),
+            'total_amount': aggregates['total_amount'] or 0,
+            'average_amount': aggregates['average_amount'] or 0,
+            'status_breakdown': status_breakdown,
+            'conversion_rate': round(conversion_rate, 2),
+            'quotes_by_month': quotes_by_month,
+            'top_project_types': top_project_types,
+        }
