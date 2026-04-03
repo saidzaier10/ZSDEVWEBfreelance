@@ -180,6 +180,7 @@ import { getProjects, getTestimonials } from '../api/portfolio'
 import ModernButton from '../components/ui/ModernButton.vue'
 import BentoGrid from '../components/ui/BentoGrid.vue'
 import BentoItem from '../components/ui/BentoItem.vue'
+import { PORTFOLIO_CATEGORY_LABELS } from '../utils/constants'
 
 const selectedFilter = ref('all')
 const projects = ref([])
@@ -194,15 +195,7 @@ const filteredProjects = computed(() => {
   return projects.value.filter(project => project.category === selectedFilter.value)
 })
 
-const getCategoryLabel = (category) => {
-  const labels = {
-    'web': 'Site Web',
-    'ecommerce': 'E-commerce',
-    'mobile': 'Application',
-    'other': 'Autre'
-  }
-  return labels[category] || category
-}
+const getCategoryLabel = (category) => PORTFOLIO_CATEGORY_LABELS[category] || category
 
 const getFilterLabel = (filter) => {
   const labels = {

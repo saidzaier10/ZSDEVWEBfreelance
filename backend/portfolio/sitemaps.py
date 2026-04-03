@@ -2,6 +2,17 @@ from django.contrib.sitemaps import Sitemap
 from django.conf import settings
 from .models import Project
 
+FRONTEND_URL = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+
+STATIC_FRONTEND_URLS = {
+    'home': '/',
+    'portfolio': '/portfolio',
+    'contact': '/contact',
+    'login': '/login',
+    'register': '/register',
+}
+
+
 class ProjectSitemap(Sitemap):
     changefreq = "weekly"
     priority = 0.8
@@ -14,8 +25,8 @@ class ProjectSitemap(Sitemap):
         return obj.updated_at
 
     def location(self, obj):
-        # Retourne l'URL du frontend pour ce projet
-        return f"/portfolio/{obj.slug}"
+        return f"{FRONTEND_URL}/portfolio/{obj.slug}"
+
 
 class StaticViewSitemap(Sitemap):
     changefreq = "monthly"
@@ -23,15 +34,7 @@ class StaticViewSitemap(Sitemap):
     protocol = 'https'
 
     def items(self):
-        return ['home', 'portfolio', 'contact', 'login', 'register']
+        return list(STATIC_FRONTEND_URLS.keys())
 
     def location(self, item):
-        # Mapping des noms de vues vers les URLs frontend
-        mapping = {
-            'home': '/',
-            'portfolio': '/portfolio',
-            'contact': '/contact',
-            'login': '/login',
-            'register': '/register',
-        }
-        return mapping.get(item, '/')
+        return f"{FRONTEND_URL}{STATIC_FRONTEND_URLS.get(item, '/')}"

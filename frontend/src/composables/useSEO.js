@@ -1,23 +1,29 @@
 import { useTitle } from '@vueuse/core'
 
+const SITE_NAME = 'Zsdevweb'
+const DEFAULT_DESCRIPTION = 'Solutions web innovantes et sur mesure.'
+
 export function useSEO(title, description, image = null, jsonLd = null) {
+    const fullTitle = `${title} | ${SITE_NAME}`
+    const resolvedDescription = description || DEFAULT_DESCRIPTION
+
     // Update Title
     const pageTitle = useTitle()
-    pageTitle.value = `${title} | Zsdevweb`
+    pageTitle.value = fullTitle
 
     // Update Meta Description
-    updateMeta('description', description || 'Solutions web innovantes et sur mesure.')
+    updateMeta('description', resolvedDescription)
 
     // Update OG Tags
-    updateMeta('og:title', `${title} | Zsdevweb`, 'property')
-    updateMeta('og:description', description || 'Solutions web innovantes et sur mesure.', 'property')
+    updateMeta('og:title', fullTitle, 'property')
+    updateMeta('og:description', resolvedDescription, 'property')
     if (image) {
         updateMeta('og:image', image, 'property')
     }
 
     // Update Twitter Tags
-    updateMeta('twitter:title', `${title} | Zsdevweb`, 'property')
-    updateMeta('twitter:description', description || 'Solutions web innovantes et sur mesure.', 'property')
+    updateMeta('twitter:title', fullTitle, 'property')
+    updateMeta('twitter:description', resolvedDescription, 'property')
     if (image) {
         updateMeta('twitter:image', image, 'property')
     }

@@ -4,6 +4,17 @@
  */
 
 /**
+ * Labels des catégories de projets portfolio
+ */
+export const PORTFOLIO_CATEGORY_LABELS = {
+  'web': 'Site Web',
+  'ecommerce': 'E-commerce',
+  'mobile': 'Application Mobile',
+  'api': 'API / Backend',
+  'other': 'Autre'
+}
+
+/**
  * Statuts des devis
  */
 export const QUOTE_STATUSES = {

@@ -125,22 +125,14 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProject } from '../api/portfolio'
 import { useSEO } from '../composables/useSEO'
+import { PORTFOLIO_CATEGORY_LABELS } from '../utils/constants'
 
 const route = useRoute()
 const project = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
-const getCategoryLabel = (category) => {
-    const labels = {
-        'web': 'Site Web',
-        'ecommerce': 'E-commerce',
-        'mobile': 'Application Mobile',
-        'api': 'API / Backend',
-        'other': 'Autre'
-    }
-    return labels[category] || category
-}
+const getCategoryLabel = (category) => PORTFOLIO_CATEGORY_LABELS[category] || category
 
 const formatDate = (dateString) => {
     if (!dateString) return ''
@@ -165,7 +157,8 @@ const loadProject = async () => {
             project.value.image_main || project.value.thumbnail
         )
     } catch (err) {
-        console.error('Erreur chargement projet:', err)
+        // Erreur loguée via le message affiché dans le template
+        if (import.meta.env.DEV) console.error('Erreur chargement projet:', err)
         error.value = "Impossible de charger le projet. Il n'existe peut-être pas ou a été déplacé."
     } finally {
         loading.value = false
