@@ -2,9 +2,11 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from datetime import timedelta
 from decimal import Decimal
 import secrets
 import string
+from .utils.constants import QuoteStatus, BillingType, PaymentConfig, QuoteConfig
 
 User = get_user_model()
 
@@ -135,11 +137,7 @@ class ComplexityLevel(models.Model):
 
 class SupplementaryOption(models.Model):
     """Options supplémentaires (SEO, Maintenance, etc.)"""
-    BILLING_TYPE_CHOICES = [
-        ('one_time', 'Paiement unique'),
-        ('monthly', 'Mensuel'),
-        ('yearly', 'Annuel'),
-    ]
+    BILLING_TYPE_CHOICES = BillingType.CHOICES
 
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField()
@@ -206,14 +204,7 @@ class QuoteTemplate(models.Model):
 
 class Quote(models.Model):
     """Devis créés par les utilisateurs"""
-    STATUS_CHOICES = [
-        ('draft', 'Brouillon'),
-        ('sent', 'Envoyé'),
-        ('viewed', 'Consulté'),
-        ('accepted', 'Accepté'),
-        ('rejected', 'Refusé'),
-        ('expired', 'Expiré'),
-    ]
+    STATUS_CHOICES = QuoteStatus.CHOICES
 
     # Informations client
     client_name = models.CharField(max_length=200, verbose_name="Nom du client")
@@ -484,10 +475,10 @@ class Quote(models.Model):
         # 8. Total TTC
         total_ttc = subtotal_after_discount + tva_amount
 
-        # 9. Répartition des paiements (30% / 40% / 30%)
-        payment_first = total_ttc * Decimal('0.30')
-        payment_second = total_ttc * Decimal('0.40')
-        payment_final = total_ttc * Decimal('0.30')
+        # 9. Répartition des paiements
+        payment_first = total_ttc * Decimal(str(PaymentConfig.FIRST_PAYMENT_PERCENT))
+        payment_second = total_ttc * Decimal(str(PaymentConfig.SECOND_PAYMENT_PERCENT))
+        payment_final = total_ttc * Decimal(str(PaymentConfig.FINAL_PAYMENT_PERCENT))
 
         # 10. Durée estimée
         estimated_days = self.project_type.estimated_days if self.project_type else 10
@@ -542,10 +533,9 @@ class Quote(models.Model):
             self.signature_token = ''.join(secrets.choice(alphabet) for _ in range(64))
     
     def calculate_expiration_date(self):
-        """Calcule la date d'expiration (30 jours après création)"""
+        """Calcule la date d'expiration selon QuoteConfig.DEFAULT_EXPIRATION_DAYS"""
         if not self.expires_at:
-            from datetime import timedelta
-            self.expires_at = timezone.now() + timedelta(days=30)
+            self.expires_at = timezone.now() + timedelta(days=QuoteConfig.DEFAULT_EXPIRATION_DAYS)
     
     def check_if_expired(self):
         """Vérifie et marque le devis comme expiré si nécessaire"""
@@ -608,7 +598,6 @@ class Quote(models.Model):
 
         # Calculer les dates estimées
         if self.estimated_start_date and not self.estimated_end_date:
-            from datetime import timedelta
             self.estimated_end_date = self.estimated_start_date + timedelta(days=self.estimated_duration_days)
 
         super().save(*args, **kwargs)

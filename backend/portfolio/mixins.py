@@ -1,4 +1,8 @@
+import logging
 from .image_optimizer import optimize_image
+
+logger = logging.getLogger(__name__)
+
 
 class ImageOptimizationMixin:
     """
@@ -23,6 +27,6 @@ class ImageOptimizationMixin:
                     )
                     setattr(self, field_name, optimized)
                 except Exception as e:
-                    print(f"⚠️ Could not optimize {field_name}: {e}")
+                    logger.warning("Could not optimize %s: %s", field_name, e)
         
         super().save(*args, **kwargs)
