@@ -147,7 +147,6 @@ const {
   downloading,
   loadData,
   sendQuote,
-  sendQuote,
   downloadPDF,
   saveQuote: saveQuoteAPI,
   bulkDeleteQuotes
